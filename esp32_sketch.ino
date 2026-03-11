@@ -54,4 +54,4 @@ void loop() {
     }
     http.end();
   }
-  delay(300000); // Check every 5 minutes
+  delay(360000); // Check every 60 minutes
