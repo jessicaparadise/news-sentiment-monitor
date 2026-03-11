@@ -1,57 +1,64 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
+import json
+import urllib.request
+import boto3
+from datetime import datetime, timezone
 
-const char* ssid = "eero";
-const char* password = "4Flying247";
-const char* apiUrl = "https://8c8xzuvoj1.execute-api.us-east-2.amazonaws.com/sentiment";
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('news-sentiment-history')
 
-// LED pins
-#define RED_PIN 27
-#define YELLOW_PIN 26
-#define GREEN_PIN 25
+NEGATIVE_WORDS = ["war", "crisis", "crash", "attack", "death", "disaster", 
+                  "threat", "conflict", "explosion", "killed", "chaos"]
+POSITIVE_WORDS = ["peace", "growth", "recovery", "success", "victory", 
+                  "breakthrough", "agreement", "hope", "progress", "wins"]
 
-void setup() {
-  Serial.begin(115200);
-  pinMode(RED_PIN, OUTPUT);
-  pinMode(YELLOW_PIN, OUTPUT);
-  pinMode(GREEN_PIN, OUTPUT);
+def analyze_sentiment(headlines):
+    score = 0
+    for headline in headlines:
+        headline_lower = headline.lower()
+        for word in NEGATIVE_WORDS:
+            if word in headline_lower:
+                score -= 1
+        for word in POSITIVE_WORDS:
+            if word in headline_lower:
+                score += 1
+    return score
 
-  // Connect to WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nConnected!");
-}
+def lambda_handler(event, context):
+    url = "https://newsapi.org/v2/top-headlines?country=us&apiKey=222e90ee9ae54c86ad03691c601cf68d"
+    
+    with urllib.request.urlopen(url) as response:
+        data = json.loads(response.read().decode())
+    
+    headlines = [article['title'] for article in data['articles'][:10]]
+    score = analyze_sentiment(headlines)
+    
+    if score >= 2:
+        mood = "POSITIVE"
+        color = "GREEN"
+    elif score <= -2:
+        mood = "NEGATIVE"
+        color = "RED"
+    else:
+        mood = "NEUTRAL"
+        color = "YELLOW"
 
-void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(apiUrl);
-    int httpCode = http.GET();
-
-    if (httpCode == 200) {
-      String payload = http.getString();
-      Serial.println(payload);
-
-      // Simple color detection
-      if (payload.indexOf("RED") > 0) {
-        digitalWrite(RED_PIN, HIGH);
-        digitalWrite(YELLOW_PIN, LOW);
-        digitalWrite(GREEN_PIN, LOW);
-      } else if (payload.indexOf("YELLOW") > 0) {
-        digitalWrite(RED_PIN, LOW);
-        digitalWrite(YELLOW_PIN, HIGH);
-        digitalWrite(GREEN_PIN, LOW);
-      } else {
-        digitalWrite(RED_PIN, LOW);
-        digitalWrite(YELLOW_PIN, LOW);
-        digitalWrite(GREEN_PIN, HIGH);
-      }
+    timestamp = datetime.now(timezone.utc).isoformat()
+    
+    table.put_item(Item={
+        'timestamp': timestamp,
+        'score': score,
+        'mood': mood,
+        'color': color,
+        'headlines': headlines
+    })
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'timestamp': timestamp,
+            'headlines': headlines,
+            'score': score,
+            'mood': mood,
+            'color': color
+        })
     }
-    http.end();
-  }
-  delay(300000); // Check every 5 minutes
