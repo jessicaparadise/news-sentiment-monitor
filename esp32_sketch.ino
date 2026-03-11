@@ -3,7 +3,7 @@
 #include <ArduinoJson.h>
 
 const char* ssid = "eero";
-const char* password = "4Flying247";
+const char* password = 
 const char* apiUrl = "https://8c8xzuvoj1.execute-api.us-east-2.amazonaws.com/sentiment";
 
 // LED pins
