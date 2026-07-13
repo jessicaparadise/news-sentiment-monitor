@@ -6,7 +6,7 @@ and displays the result via physical LED indicators.
 
 ## 🔴🟡🟢 How It Works
 
-1. **ESP-32** connects to WiFi and calls a REST API every 5 minutes
+1. **ESP-32** connects to WiFi and calls a REST API every 60 minutes
 2. **AWS Lambda** fetches top US headlines from NewsAPI
 3. **Sentiment analysis** scores the headlines as POSITIVE, NEUTRAL, or NEGATIVE
 4. **DynamoDB** stores historical mood data
